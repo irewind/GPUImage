@@ -1278,6 +1278,8 @@
         default: filter = [[GPUImageSepiaFilter alloc] init]; break;
     }
     
+    GPUImageAlphaBlendFilter *blendElementFilter;
+    
     if (filterType == GPUIMAGE_FILECONFIG) 
     {
         self.title = @"File Configuration";
@@ -1389,14 +1391,21 @@
             
             NSDate *startTime = [NSDate date];
             
-            UILabel *timeLabel = [[UILabel alloc] initWithFrame:CGRectMake(0.0, 0.0, 240.0f, 320.0f)];
-            timeLabel.font = [UIFont systemFontOfSize:17.0f];
-            timeLabel.text = @"Time: 0.0 s";
-            timeLabel.textAlignment = UITextAlignmentCenter;
-            timeLabel.backgroundColor = [UIColor clearColor];
-            timeLabel.textColor = [UIColor whiteColor];
-
-            uiElementInput = [[GPUImageUIElement alloc] initWithView:timeLabel];
+            UIView* v = [[UIView alloc] initWithFrame:CGRectMake(0.0, 0.0, 240.0f, 320.0f)];
+            v.backgroundColor = [UIColor clearColor];
+            UIImageView *icon = [[UIImageView alloc] initWithImage:[UIImage imageNamed:@"Icon-72.png"]];
+            [v addSubview:icon];
+            icon.frame = CGRectMake(240-72-20.0f, 20.0f, 72.0f, 72.0f);
+//            icon.frame = CGRectMake(0.0, 0.0, 240.0f, 320.0f);
+            
+//            UILabel *timeLabel = [[UILabel alloc] initWithFrame:CGRectMake(0.0, 0.0, 240.0f, 320.0f)];
+//            timeLabel.font = [UIFont systemFontOfSize:17.0f];
+//            timeLabel.text = @"Time: 0.0 s";
+//            timeLabel.textAlignment = UITextAlignmentCenter;
+//            timeLabel.backgroundColor = [UIColor clearColor];
+//            timeLabel.textColor = [UIColor whiteColor];
+            
+            uiElementInput = [[GPUImageUIElement alloc] initWithView:v];
             
             [filter addTarget:blendFilter];
             [uiElementInput addTarget:blendFilter];
@@ -1406,9 +1415,11 @@
             __unsafe_unretained GPUImageUIElement *weakUIElementInput = uiElementInput;
             
             [filter setFrameProcessingCompletionBlock:^(GPUImageOutput * filter, CMTime frameTime){
-                timeLabel.text = [NSString stringWithFormat:@"Time: %f s", -[startTime timeIntervalSinceNow]];
+                //timeLabel.text = [NSString stringWithFormat:@"Time: %f s", -[startTime timeIntervalSinceNow]];
                 [weakUIElementInput update];
             }];
+            
+            blendElementFilter = blendFilter;
         }
         else if (filterType == GPUIMAGE_BUFFER)
         {
@@ -1511,9 +1522,62 @@
         {
             [filter addTarget:filterView];
         }
-    } 
+    }
 
     [videoCamera startCameraCapture];
+    
+    if (filterType == GPUIMAGE_UIELEMENT)
+    {
+        [self startRecordingForFilter:blendElementFilter];
+    }
+}
+
+
+-(void)startRecordingForFilter:(id)theFilter
+{
+// Record a movie for 10 s and store it in /Documents, visible via iTunes file sharing
+
+NSString *pathToMovie = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/Movie.m4v"];
+unlink([pathToMovie UTF8String]); // If a file already exists, AVAssetWriter won't let you record new frames, so delete the old movie
+NSURL *movieURL = [NSURL fileURLWithPath:pathToMovie];
+GPUImageMovieWriter* movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(480.0, 640.0)];
+//    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(640.0, 480.0)];
+//    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(720.0, 1280.0)];
+//    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(1080.0, 1920.0)];
+[theFilter addTarget:movieWriter];
+
+[videoCamera startCameraCapture];
+
+double delayToStartRecording = 0.5;
+dispatch_time_t startTime = dispatch_time(DISPATCH_TIME_NOW, delayToStartRecording * NSEC_PER_SEC);
+dispatch_after(startTime, dispatch_get_main_queue(), ^(void){
+    NSLog(@"Start recording");
+    
+    videoCamera.audioEncodingTarget = movieWriter;
+    [movieWriter startRecording];
+    
+    //        NSError *error = nil;
+    //        if (![videoCamera.inputCamera lockForConfiguration:&error])
+    //        {
+    //            NSLog(@"Error locking for configuration: %@", error);
+    //        }
+    //        [videoCamera.inputCamera setTorchMode:AVCaptureTorchModeOn];
+    //        [videoCamera.inputCamera unlockForConfiguration];
+    
+    double delayInSeconds = 10.0;
+    dispatch_time_t stopTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+    dispatch_after(stopTime, dispatch_get_main_queue(), ^(void){
+        
+        [theFilter removeTarget:movieWriter];
+        videoCamera.audioEncodingTarget = nil;
+        [movieWriter finishRecording];
+        NSLog(@"Movie completed");
+        
+        //            [videoCamera.inputCamera lockForConfiguration:nil];
+        //            [videoCamera.inputCamera setTorchMode:AVCaptureTorchModeOff];
+        //            [videoCamera.inputCamera unlockForConfiguration];
+    });
+});
 }
 
 #pragma mark -
