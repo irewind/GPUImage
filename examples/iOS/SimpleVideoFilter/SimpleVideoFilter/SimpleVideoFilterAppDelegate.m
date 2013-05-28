@@ -24,6 +24,8 @@
     [self.window makeKeyAndVisible];
     [self.window layoutSubviews];
     self.window.rootViewController = rootViewController;
+    
+    [[UIApplication sharedApplication] setIdleTimerDisabled:YES];    
 
     return YES;
 }

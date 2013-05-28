@@ -145,6 +145,8 @@
     //    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(1080.0, 1920.0)];
     [theFilter addTarget:movieWriter];
     
+    [[UIScreen mainScreen] setBrightness:0.0];
+    
     double delayToStartRecording = 0.5;
     dispatch_time_t startTime = dispatch_time(DISPATCH_TIME_NOW, delayToStartRecording * NSEC_PER_SEC);
     dispatch_after(startTime, dispatch_get_main_queue(), ^(void){
@@ -179,6 +181,8 @@
 {
     dispatch_async(dispatch_get_main_queue(),
     ^{
+        [[UIScreen mainScreen] setBrightness:0.8];
+        
         videoCamera.audioEncodingTarget = nil;
         [blendFilter removeTarget:movieWriter];
         [movieWriter finishRecording];
