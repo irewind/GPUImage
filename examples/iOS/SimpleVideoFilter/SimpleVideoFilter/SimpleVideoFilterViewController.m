@@ -190,21 +190,19 @@
     });
 }
 
--(void) stopRecording
-{
-    dispatch_async(dispatch_get_main_queue(),
-    ^{
-        [[UIScreen mainScreen] setBrightness:0.8];
-        
-        videoCamera.audioEncodingTarget = nil;
-        [blendFilter removeTarget:movieWriter];
-        [movieWriter finishRecording];
-    
-        recording = NO;
-    
-        NSLog(@"Movie completed");
-        
-        stopBtn.enabled = NO;
+        double delayInSeconds = 30.0;
+        dispatch_time_t stopTime = dispatch_time(DISPATCH_TIME_NOW, delayInSeconds * NSEC_PER_SEC);
+        dispatch_after(stopTime, dispatch_get_main_queue(), ^(void){
+            
+            [filter removeTarget:movieWriter];
+            videoCamera.audioEncodingTarget = nil;
+            [movieWriter finishRecording];
+            NSLog(@"Movie completed");
+            
+//            [videoCamera.inputCamera lockForConfiguration:nil];
+//            [videoCamera.inputCamera setTorchMode:AVCaptureTorchModeOff];
+//            [videoCamera.inputCamera unlockForConfiguration];
+        });
     });
 }
 
