@@ -11,9 +11,11 @@
     UIButton* stopBtn;
     BOOL recording;
     
-//    NSDate* lastBatteryCheck;
 }
 
+@property (assign,nonatomic) int fps;
+@property (assign,nonatomic) int lastFps;
+@property (assign,nonatomic) NSTimeInterval lastInterval;
 - (IBAction)updateSliderValue:(id)sender;
 -(void) stopRecording;
 @end

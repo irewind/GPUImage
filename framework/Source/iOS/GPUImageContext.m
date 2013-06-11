@@ -23,7 +23,7 @@ static void *openGLESContextQueueKey;
     if (!(self = [super init]))
     {
 		return nil;
-    }
+    }    
 
 	openGLESContextQueueKey = &openGLESContextQueueKey;
     _contextQueue = dispatch_queue_create("com.sunsetlakesoftware.GPUImage.openGLESContextQueue", NULL);

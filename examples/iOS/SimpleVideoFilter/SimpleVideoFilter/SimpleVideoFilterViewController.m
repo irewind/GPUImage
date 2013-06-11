@@ -2,6 +2,9 @@
 
 @implementation SimpleVideoFilterViewController
 
+#define SCREEN_WIDTH 320.0f
+#define SCREEN_HEIGHT 460.0f
+
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
 {
     self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil];
@@ -20,29 +23,21 @@
 - (void)viewDidLoad
 {
     [super viewDidLoad];
-    
-    if ([GPUImageContext supportsFastTextureUpload])
-    {
-        NSDictionary *detectorOptions = [[NSDictionary alloc] initWithObjectsAndKeys:CIDetectorAccuracyLow, CIDetectorAccuracy, nil];
-        CIDetector* faceDetector = [CIDetector detectorOfType:CIDetectorTypeFace context:nil options:detectorOptions];
-    }
-
-    
+        
     GPUImageView *filterView = (GPUImageView *)self.view;
         
-    videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:AVCaptureSessionPreset640x480 cameraPosition:AVCaptureDevicePositionBack];
+//    videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:AVCaptureSessionPreset1280x720 cameraPosition:AVCaptureDevicePositionBack];
+    videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:AVCaptureSessionPresetiFrame960x540 cameraPosition:AVCaptureDevicePositionBack];
+    
+//    [videoCamera forceProcessingAtSizeRespectingAspectRatio:CGSize(640x480)];
+
     videoCamera.outputImageOrientation = UIInterfaceOrientationPortrait;
-    //    videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:AVCaptureSessionPreset640x480 cameraPosition:AVCaptureDevicePositionFront];
-    //    videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:AVCaptureSessionPreset1280x720 cameraPosition:AVCaptureDevicePositionBack];
-    //    videoCamera = [[GPUImageVideoCamera alloc] initWithSessionPreset:AVCaptureSessionPreset1920x1080 cameraPosition:AVCaptureDevicePositionBack];
-    
-    videoCamera.outputImageOrientation = UIInterfaceOrientationPortrait;
-    
-    filter = [[GPUImageSepiaFilter alloc] init];
-    [videoCamera addTarget:filter];
-    
+
+//    filter = [[GPUImageSepiaFilter alloc] init];
+    filter = [[GPUImageFilter alloc] init];
+
     blendFilter = [[GPUImageAlphaBlendFilter alloc] init];
-    blendFilter.mix = 1.0;
+    blendFilter.mix = 1.0;    
 
     UIView* v = [[UIView alloc] initWithFrame:CGRectMake(0.0, 0.0, 320.0f, 460.0f)];
     v.backgroundColor = [UIColor clearColor];
@@ -57,27 +52,35 @@
     [stopBtn addTarget:self action:@selector(stopRecording) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:stopBtn];
     
-    UILabel* timeLabel = (UILabel*)[[UILabel alloc] initWithFrame:CGRectMake(20,372,193,21)];
+    UILabel* fpsLabel = (UILabel*)[[UILabel alloc] initWithFrame:CGRectMake(20,SCREEN_HEIGHT-120,193,21)];
+    fpsLabel.font = [UIFont boldSystemFontOfSize:17.0f];
+    fpsLabel.text = @"FPS: 0";
+    fpsLabel.textAlignment = UITextAlignmentCenter;
+    fpsLabel.backgroundColor = [UIColor clearColor];
+    fpsLabel.textColor = [UIColor whiteColor];
+    [v addSubview:fpsLabel];
+    
+    UILabel* timeLabel = (UILabel*)[[UILabel alloc] initWithFrame:CGRectMake(20,SCREEN_HEIGHT-90,193,21)];
     timeLabel.font = [UIFont boldSystemFontOfSize:17.0f];
     timeLabel.text = @"Time: 0.0 s";
     timeLabel.textAlignment = UITextAlignmentCenter;
     timeLabel.backgroundColor = [UIColor clearColor];
     timeLabel.textColor = [UIColor whiteColor];
     [v addSubview:timeLabel];
-
-    UILabel* recLabel = (UILabel*)[[UILabel alloc] initWithFrame:CGRectMake(20,401,193,21)];
+    
+    UILabel* recLabel = (UILabel*)[[UILabel alloc] initWithFrame:CGRectMake(20,SCREEN_HEIGHT-60,193,21)];
     recLabel.font = [UIFont boldSystemFontOfSize:17.0f];
     recLabel.text = @"Recording: OFF";
     recLabel.textAlignment = UITextAlignmentCenter;
     recLabel.backgroundColor = [UIColor clearColor];
     recLabel.textColor = [UIColor whiteColor];
-    [v addSubview:recLabel];    
+    [v addSubview:recLabel];
     
     UIDevice *myDevice = [UIDevice currentDevice];
     [myDevice setBatteryMonitoringEnabled:YES];
     float batteryLevel = [myDevice batteryLevel];
     
-    UILabel* batteryLabel = (UILabel*)[[UILabel alloc] initWithFrame:CGRectMake(20,430,193,21)];
+    UILabel* batteryLabel = (UILabel*)[[UILabel alloc] initWithFrame:CGRectMake(20,SCREEN_HEIGHT-30,193,21)];
     batteryLabel.font = [UIFont boldSystemFontOfSize:17.0f];
     batteryLabel.text = [NSString stringWithFormat:@"Battery: %f%%",batteryLevel * 100];
     batteryLabel.textAlignment = UITextAlignmentCenter;
@@ -86,23 +89,40 @@
     [v addSubview:batteryLabel];
 
     uiElementInput = [[GPUImageUIElement alloc] initWithView:v];
-        
+    
     [filter addTarget:blendFilter];
     [uiElementInput addTarget:blendFilter];
-    
-    [blendFilter addTarget:filterView];
-    
+//    blendFilter forceProcessingAtSizeRespectingAspectRatio:CGSize
+    [videoCamera addTarget:filter];
+
+     GPUImageFilter*  filter2 = [[GPUImageFilter alloc] init];
+//        [blendFilter addTarget:filter2];
+//        [filter2 addTarget:filterView];
+    [filter2 forceProcessingAtSizeRespectingAspectRatio:CGSizeMake(320, 460)];
     __unsafe_unretained GPUImageUIElement *weakUIElementInput = uiElementInput;
     
     NSDate *startTime = [NSDate date];
     __block NSTimeInterval initInterval = [[NSDate date] timeIntervalSinceReferenceDate];
     __block NSTimeInterval diff = 0;
-    [filter setFrameProcessingCompletionBlock:^(GPUImageOutput * filter, CMTime frameTime){
+    
+    __block SimpleVideoFilterViewController* bself = self;
+    
+    [filter setFrameProcessingCompletionBlock:^(GPUImageOutput * filter, CMTime frameTime)
+    {
         timeLabel.text = [NSString stringWithFormat:@"Time: %f s", -[startTime timeIntervalSinceNow]];
         
         recLabel.text = [NSString stringWithFormat:@"Recording: %@",recording?@"YES":@"NO"];
         
         diff = [NSDate timeIntervalSinceReferenceDate] - initInterval;
+        
+        if (diff - bself.lastInterval > 1.0)
+        {
+            bself.lastInterval = diff;
+            bself.lastFps = bself.fps;
+            bself.fps = 0;
+        }
+        bself.fps++;
+        fpsLabel.text = [NSString stringWithFormat:@"FPS: %i",bself.lastFps];
         
         if ((diff) > 60.0f )
         {
@@ -125,9 +145,10 @@
     }];
     
     [videoCamera startCameraCapture];
-
     
     [self startRecordingForFilter:blendFilter];
+//        [self startRecordingForFilter:filter];
+//    [self startRecordingForFilter:videoCamera];
 }
 
 -(void)startRecordingForFilter:(id)theFilter
@@ -139,13 +160,13 @@
     NSString *pathToMovie = [NSHomeDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"Documents/%@.m4v",movieName]];
     //unlink([pathToMovie UTF8String]); // If a file already exists, AVAssetWriter won't let you record new frames, so delete the old movie
     NSURL *movieURL = [NSURL fileURLWithPath:pathToMovie];
-    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(480.0, 640.0)];
-    //    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(640.0, 480.0)];
-    //    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(720.0, 1280.0)];
+    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(540.0, 960.0)];
+//        movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(1280.0, 720.0)];
+        movieWriter.hasAudioTrack = NO;
     //    movieWriter = [[GPUImageMovieWriter alloc] initWithMovieURL:movieURL size:CGSizeMake(1080.0, 1920.0)];
     [theFilter addTarget:movieWriter];
     
-    [[UIScreen mainScreen] setBrightness:0.0];
+    //[[UIScreen mainScreen] setBrightness:0.0];
     
     double delayToStartRecording = 0.5;
     dispatch_time_t startTime = dispatch_time(DISPATCH_TIME_NOW, delayToStartRecording * NSEC_PER_SEC);
@@ -153,17 +174,9 @@
         stopBtn.enabled = YES;
         recording = YES;
         NSLog(@"Start recording");
-        videoCamera.audioEncodingTarget = movieWriter;
+        videoCamera.audioEncodingTarget = nil;
+        
         [movieWriter startRecording];
-        
-        //        NSError *error = nil;
-        //        if (![videoCamera.inputCamera lockForConfiguration:&error])
-        //        {
-        //            NSLog(@"Error locking for configuration: %@", error);
-        //        }
-        //        [videoCamera.inputCamera setTorchMode:AVCaptureTorchModeOn];
-        //        [videoCamera.inputCamera unlockForConfiguration];
-        
     });
 }
 
@@ -236,11 +249,6 @@
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation
 {
     return YES; // Support all orientations.
-}
-
-- (IBAction)updateSliderValue:(id)sender
-{
-    [(GPUImageSepiaFilter *)filter setIntensity:[(UISlider *)sender value]];
 }
 
 @end
