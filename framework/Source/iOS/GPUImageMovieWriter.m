@@ -731,5 +731,10 @@ NSString *const kGPUImageColorSwizzlingFragmentShaderString = SHADER_STRING
     }
 }
 
+-(NSURL*)movieURL
+{
+    return movieURL;
+}
+
 
 @end
