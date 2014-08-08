@@ -200,6 +200,16 @@ NSString *const kGPUImageHistogramAccumulationFragmentShaderString = SHADER_STRI
     return self;
 }
 
+- (id)init;
+{
+    if (!(self = [self initWithHistogramType:kGPUImageHistogramRGB]))
+    {
+        return nil;
+    }
+
+    return self;
+}
+
 - (void)initializeSecondaryAttributes;
 {
     [secondFilterProgram addAttribute:@"position"];
@@ -229,14 +239,12 @@ NSString *const kGPUImageHistogramAccumulationFragmentShaderString = SHADER_STRI
 
 - (void)newFrameReadyAtTime:(CMTime)frameTime atIndex:(NSInteger)textureIndex;
 {
-    outputTextureRetainCount = [targets count];
-
     if (vertexSamplingCoordinates == NULL)
     {
         [self generatePointCoordinates];
     }
     
-    [self renderToTextureWithVertices:NULL textureCoordinates:NULL sourceTexture:filterSourceTexture];
+    [self renderToTextureWithVertices:NULL textureCoordinates:NULL];
     
     [self informTargetsAboutNewFrameAtTime:frameTime];
 }
@@ -261,7 +269,7 @@ NSString *const kGPUImageHistogramAccumulationFragmentShaderString = SHADER_STRI
     inputRotation = kGPUImageNoRotation;
 }
 
-- (void)renderToTextureWithVertices:(const GLfloat *)vertices textureCoordinates:(const GLfloat *)textureCoordinates sourceTexture:(GLuint)sourceTexture;
+- (void)renderToTextureWithVertices:(const GLfloat *)vertices textureCoordinates:(const GLfloat *)textureCoordinates;
 {
     // we need a normal color texture for this filter
     NSAssert(self.outputTextureOptions.internalFormat == GL_RGBA, @"The output texture format for this filter must be GL_RGBA.");
@@ -269,15 +277,20 @@ NSString *const kGPUImageHistogramAccumulationFragmentShaderString = SHADER_STRI
     
     if (self.preventRendering)
     {
+        [firstInputFramebuffer unlock];
         return;
     }
     
     [GPUImageContext useImageProcessingContext];
     
     glReadPixels(0, 0, inputTextureSize.width, inputTextureSize.height, GL_RGBA, GL_UNSIGNED_BYTE, vertexSamplingCoordinates);
-
-    [self setFilterFBO];
-        
+    outputFramebuffer = [[GPUImageContext sharedFramebufferCache] fetchFramebufferForSize:[self sizeOfFBO] textureOptions:self.outputTextureOptions onlyTexture:NO];
+    [outputFramebuffer activateFramebuffer];
+    if (usingNextFrameForImageCapture)
+    {
+        [outputFramebuffer lock];
+    }
+    
     [GPUImageContext setActiveShaderProgram:filterProgram];
     
     glClearColor(0.0, 0.0, 0.0, 1.0);
@@ -287,23 +300,29 @@ NSString *const kGPUImageHistogramAccumulationFragmentShaderString = SHADER_STRI
     glBlendFunc(GL_ONE, GL_ONE);
     glEnable(GL_BLEND);
     
-	glVertexAttribPointer(filterPositionAttribute, 4, GL_UNSIGNED_BYTE, 0, (_downsamplingFactor - 1) * 4, vertexSamplingCoordinates);
+	glVertexAttribPointer(filterPositionAttribute, 4, GL_UNSIGNED_BYTE, 0, ((unsigned int)_downsamplingFactor - 1) * 4, vertexSamplingCoordinates);
     glDrawArrays(GL_POINTS, 0, inputTextureSize.width * inputTextureSize.height / (CGFloat)_downsamplingFactor);
 
     if (histogramType == kGPUImageHistogramRGB)
     {
         [GPUImageContext setActiveShaderProgram:secondFilterProgram];
         
-        glVertexAttribPointer(secondFilterPositionAttribute, 4, GL_UNSIGNED_BYTE, 0, (_downsamplingFactor - 1) * 4, vertexSamplingCoordinates);
+        glVertexAttribPointer(secondFilterPositionAttribute, 4, GL_UNSIGNED_BYTE, 0, ((unsigned int)_downsamplingFactor - 1) * 4, vertexSamplingCoordinates);
         glDrawArrays(GL_POINTS, 0, inputTextureSize.width * inputTextureSize.height / (CGFloat)_downsamplingFactor);
 
         [GPUImageContext setActiveShaderProgram:thirdFilterProgram];
         
-        glVertexAttribPointer(thirdFilterPositionAttribute, 4, GL_UNSIGNED_BYTE, 0, (_downsamplingFactor - 1) * 4, vertexSamplingCoordinates);
+        glVertexAttribPointer(thirdFilterPositionAttribute, 4, GL_UNSIGNED_BYTE, 0, ((unsigned int)_downsamplingFactor - 1) * 4, vertexSamplingCoordinates);
         glDrawArrays(GL_POINTS, 0, inputTextureSize.width * inputTextureSize.height / (CGFloat)_downsamplingFactor);
     }
     
     glDisable(GL_BLEND);
+    [firstInputFramebuffer unlock];
+
+    if (usingNextFrameForImageCapture)
+    {
+        dispatch_semaphore_signal(imageCaptureSemaphore);
+    }
 }
 
 #pragma mark -

@@ -125,9 +125,11 @@ NSString *const kGPUImageSobelEdgeDetectionFragmentShaderString = SHADER_STRING
         _texelHeight = 1.0 / filterFrameSize.height;
         
         runSynchronouslyOnVideoProcessingQueue(^{
+            GLProgram *previousProgram = [GPUImageContext sharedImageProcessingContext].currentShaderProgram;
             [GPUImageContext setActiveShaderProgram:secondFilterProgram];
             glUniform1f(texelWidthUniform, _texelWidth);
             glUniform1f(texelHeightUniform, _texelHeight);
+            [GPUImageContext setActiveShaderProgram:previousProgram];
         });
     }
 }
@@ -145,12 +147,14 @@ NSString *const kGPUImageSobelEdgeDetectionFragmentShaderString = SHADER_STRING
 
 - (BOOL)wantsMonochromeInput;
 {
-    return YES;
+//    return YES;
+    return NO;
 }
 
 - (BOOL)providesMonochromeOutput;
 {
-    return YES;
+//    return YES;
+    return NO;
 }
 
 #pragma mark -
